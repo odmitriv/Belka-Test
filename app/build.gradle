@@ -42,6 +42,7 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.2.0'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.2.0'
     implementation 'androidx.room:room-runtime:2.2.6'
+    implementation 'androidx.room:room-rxjava2:2.2.6'
     kapt 'androidx.room:room-compiler:2.2.6'
     implementation 'com.mapbox.mapboxsdk:mapbox-android-sdk:9.2.1'
     implementation 'com.mapbox.mapboxsdk:mapbox-android-plugin-markerview-v7:0.2.0'

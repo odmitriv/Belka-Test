@@ -54,23 +54,25 @@ class MainViewModel(
     fun requestMarkerList() {
         subscriptions.clear()
         subscriptions.add(
-            Observable.just(CAR_LIST_URL)
+            belkaRemoteApi.getCarList(CAR_LIST_URL).toObservable()
                 .flatMap {
-                    belkaRemoteApi.getCarList(it)
-                        .map { list ->
-                            carDao.insertAll(list)
-                            sharedPreferences.edit(commit = true) {
-                                putLong(CACHE_LIFE_TIME, System.currentTimeMillis())
-                            }
-                            list
-                        }
-                        .startWith(Observable.fromCallable { getCachedCarList() })
+                    carDao.insertAll(it)
+                        .andThen(Observable.just(it))
                 }
+                .map {
+                    sharedPreferences.edit(commit = true) {
+                        putLong(CACHE_LIFE_TIME, System.currentTimeMillis())
+                    }
+                    it
+                }
+                .startWith(getCachedCarList().map {
+                    it
+                })
                 // Исключает двойную перерисовку карты,
                 // если сетевые данные придут раньше, чем через 2 секунды
                 .debounce(2, TimeUnit.SECONDS)
                 .flatMap {
-                    return@flatMap transformCarListToMapFeatureList(it)
+                    transformCarListToMapFeatureList(it)
                 }
                 .map {
                     FeatureCollection.fromFeatures(it)
@@ -128,13 +130,13 @@ class MainViewModel(
      * Возвращает список из кэш или пустой, если кэш не создан или
      * хранится более одного часа.
      */
-    private fun getCachedCarList(): List<Car> {
+    private fun getCachedCarList(): Observable<List<Car>> {
         val currentTime = System.currentTimeMillis()
         val lastTime = sharedPreferences.getLong(CACHE_LIFE_TIME, 0)
         return if ((currentTime - lastTime) > CACHE_LIFE_TIME_MS) {
-            listOf()
+            Observable.just(listOf())
         } else {
-            carDao.getAll()
+            carDao.getAll().toObservable()
         }
     }
 

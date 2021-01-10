@@ -1,7 +1,6 @@
 package com.example.belkatest.di
 
 import android.content.Context
-import android.preference.PreferenceManager
 import com.example.belkatest.App
 import dagger.Module
 import dagger.Provides
