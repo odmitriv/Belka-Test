@@ -7,6 +7,7 @@ import androidx.core.content.edit
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import com.example.belkatest.data.BelkaDirectionApi
 import com.example.belkatest.data.BelkaRemoteApi
 import com.example.belkatest.data.CarDao
@@ -18,7 +19,8 @@ import com.mapbox.mapboxsdk.geometry.LatLng
 import io.reactivex.Observable
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.schedulers.Schedulers
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 
 
 const val TAG = "MainViewModel"
@@ -51,6 +53,7 @@ class MainViewModel(
      * назад.
      *
      */
+/*
     fun requestMarkerList() {
         subscriptions.clear()
         subscriptions.add(
@@ -85,6 +88,40 @@ class MainViewModel(
                     carDataError.postValue(error)
                 })
         )
+    }
+*/
+
+    @FlowPreview
+    @ExperimentalCoroutinesApi
+    fun requestMarkerList() {
+        viewModelScope.launch {
+            flow {
+                emit(getCachedCarList())
+                emit(getRemoteCarList())
+            }
+                .debounce(2000)
+                .map {
+                    flowTransformCarListToMapFeatureList(it)
+                }
+                .map {
+                    FeatureCollection.fromFeatures(it)
+                }
+                .flowOn(Dispatchers.IO)
+                .collect {
+                    Log.d(TAG, "Result")
+                    featureCollectionData.postValue(it)
+                }
+        }
+    }
+
+    private suspend fun getRemoteCarList(): List<Car> {
+        val carList = belkaRemoteApi.getCarList(CAR_LIST_URL)
+        carDao.insertAll(carList)
+        sharedPreferences.edit(commit = true) {
+            putLong(CACHE_LIFE_TIME, System.currentTimeMillis())
+        }
+        Log.d(TAG, "get Car List from remote DB")
+        return carList
     }
 
     /**
@@ -126,17 +163,51 @@ class MainViewModel(
             .toObservable()
     }
 
+    private suspend fun flowTransformCarListToMapFeatureList(carList: List<Car>): List<Feature> {
+        return carList.asFlow()
+            .map {
+                val feature = Feature.fromGeometry(
+                    Point.fromLngLat(
+                        it.longitude,
+                        it.latitude
+                    )
+                )
+                feature.addStringProperty(
+                    ICON_PROPERTY,
+                    if (it.color == "blue")
+                        ICON_BLUE_CAR_ID
+                    else
+                        ICON_BLACK_CAR_ID
+                )
+                feature.addNumberProperty(
+                    ICON_ROTATE_PROPERTY,
+                    it.angle
+                )
+                feature.addNumberProperty("id", it.id)
+                feature.addStringProperty("name", it.name)
+                feature.addStringProperty("plateNumber", it.plateNumber)
+                feature.addNumberProperty("fuelPercentage", it.fuelPercentage)
+                feature.addNumberProperty("latitude", it.latitude)
+                feature.addNumberProperty("longitude", it.longitude)
+                feature.addStringProperty("carPictureUrl", "https://picsum.photos/300/200")
+                return@map feature
+            }
+            .toList()
+    }
+
     /**
      * Возвращает список из кэш или пустой, если кэш не создан или
      * хранится более одного часа.
      */
-    private fun getCachedCarList(): Observable<List<Car>> {
+    private fun getCachedCarList(): List<Car> {
         val currentTime = System.currentTimeMillis()
         val lastTime = sharedPreferences.getLong(CACHE_LIFE_TIME, 0)
         return if ((currentTime - lastTime) > CACHE_LIFE_TIME_MS) {
-            Observable.just(listOf())
+            listOf()
         } else {
-            carDao.getAll().toObservable()
+            val carList = carDao.getAll()
+            Log.d(TAG, "get Car List from local DB")
+            carList
         }
     }
 
