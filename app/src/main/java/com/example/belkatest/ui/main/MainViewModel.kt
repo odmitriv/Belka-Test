@@ -53,44 +53,6 @@ class MainViewModel(
      * назад.
      *
      */
-/*
-    fun requestMarkerList() {
-        subscriptions.clear()
-        subscriptions.add(
-            belkaRemoteApi.getCarList(CAR_LIST_URL).toObservable()
-                .flatMap {
-                    carDao.insertAll(it)
-                        .andThen(Observable.just(it))
-                }
-                .map {
-                    sharedPreferences.edit(commit = true) {
-                        putLong(CACHE_LIFE_TIME, System.currentTimeMillis())
-                    }
-                    it
-                }
-                .startWith(getCachedCarList().map {
-                    it
-                })
-                // Исключает двойную перерисовку карты,
-                // если сетевые данные придут раньше, чем через 2 секунды
-                .debounce(2, TimeUnit.SECONDS)
-                .flatMap {
-                    transformCarListToMapFeatureList(it)
-                }
-                .map {
-                    FeatureCollection.fromFeatures(it)
-                }
-                .subscribeOn(Schedulers.io())
-                .subscribe({ list ->
-                    featureCollectionData.postValue(list)
-                }, { error ->
-                    Log.d(TAG, error.stackTraceToString())
-                    carDataError.postValue(error)
-                })
-        )
-    }
-*/
-
     @FlowPreview
     @ExperimentalCoroutinesApi
     fun requestMarkerList() {
@@ -101,7 +63,7 @@ class MainViewModel(
             }
                 .debounce(2000)
                 .map {
-                    flowTransformCarListToMapFeatureList(it)
+                    transformCarListToMapFeatureList(it)
                 }
                 .map {
                     FeatureCollection.fromFeatures(it)
@@ -130,40 +92,7 @@ class MainViewModel(
      *
      * @param carList список автомобилей с сервера.
      */
-    private fun transformCarListToMapFeatureList(carList: List<Car>): Observable<List<Feature>> {
-        return Observable.fromIterable(carList)
-            .map {
-                val feature = Feature.fromGeometry(
-                    Point.fromLngLat(
-                        it.longitude,
-                        it.latitude
-                    )
-                )
-                feature.addStringProperty(
-                    ICON_PROPERTY,
-                    if (it.color == "blue")
-                        ICON_BLUE_CAR_ID
-                    else
-                        ICON_BLACK_CAR_ID
-                )
-                feature.addNumberProperty(
-                    ICON_ROTATE_PROPERTY,
-                    it.angle
-                )
-                feature.addNumberProperty("id", it.id)
-                feature.addStringProperty("name", it.name)
-                feature.addStringProperty("plateNumber", it.plateNumber)
-                feature.addNumberProperty("fuelPercentage", it.fuelPercentage)
-                feature.addNumberProperty("latitude", it.latitude)
-                feature.addNumberProperty("longitude", it.longitude)
-                feature.addStringProperty("carPictureUrl", "https://picsum.photos/300/200")
-                return@map feature
-            }
-            .toList()
-            .toObservable()
-    }
-
-    private suspend fun flowTransformCarListToMapFeatureList(carList: List<Car>): List<Feature> {
+    private suspend fun transformCarListToMapFeatureList(carList: List<Car>): List<Feature> {
         return carList.asFlow()
             .map {
                 val feature = Feature.fromGeometry(
