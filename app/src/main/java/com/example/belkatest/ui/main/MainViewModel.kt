@@ -71,7 +71,7 @@ class MainViewModel(
                 .flowOn(Dispatchers.IO)
                 .collect {
                     Log.d(TAG, "Result")
-                    featureCollectionData.postValue(it)
+                    featureCollectionData.value = it
                 }
         }
     }
