@@ -42,6 +42,7 @@ class MainViewModel(
     val carDataError = MutableLiveData<Throwable>()
     val carData = MutableLiveData<CarData>()
     private var subscriptions: CompositeDisposable = CompositeDisposable()
+    private var job: Job? = null
 
 
     /**
@@ -56,7 +57,8 @@ class MainViewModel(
     @FlowPreview
     @ExperimentalCoroutinesApi
     fun requestMarkerList() {
-        viewModelScope.launch {
+        job?.cancel()
+        job = viewModelScope.launch {
             flow {
                 emit(getCachedCarList())
                 emit(getRemoteCarList())
